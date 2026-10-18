@@ -1,4 +1,4 @@
-/* Site-level additions on top of @vexoulz/ui. Keep this small; shared styles belong in the library. */
+/* Site-level additions on top of @vex/ui. Keep this small; shared styles belong in the library. */
 
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 20px; }
 .page-head h1.vx-display { font-size: 30px; margin: 6px 0 4px; display: flex; align-items: center; gap: 12px; }

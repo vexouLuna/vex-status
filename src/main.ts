@@ -1,9 +1,9 @@
-import '@vexoulz/ui/fonts.css'
-import '@vexoulz/ui/style.css'
+import '@vex/ui/fonts.css'
+import '@vex/ui/style.css'
 import './styles.css'
 
-import { VxBuild } from '@vexoulz/ui'
-import { createAccount } from '@vexoulz/ui/account'
+import { VxBuild } from '@vex/ui'
+import { createAccount } from '@vex/ui/account'
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 

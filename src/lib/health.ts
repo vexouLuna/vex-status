@@ -1,6 +1,6 @@
 // What the checks mean: a service's health, the whole network's, and the words and numbers the pages show.
 // Pure functions of Gatus's answers, so they are tested without a browser.
-import { SITES, type Health, type Tone, type UptimeTick } from '@vexoulz/ui'
+import { SITES, type Health, type Tone, type UptimeTick } from '@vex/ui'
 import type { Announcement, CheckResult, EndpointEvent, EndpointStatus, Period } from './gatus'
 
 export const ms = (r: CheckResult) => r.duration / 1e6

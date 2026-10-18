@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // One service on the front page: its state, uptime and average response over the chosen period, and its history
 // over that period as a bar. The name opens the service's own page.
-import { VxStatusDot, VxUptimeBar } from '@vexoulz/ui'
+import { VxStatusDot, VxUptimeBar } from '@vex/ui'
 import { computed } from 'vue'
 import type { EndpointStatus, Period } from '@/lib/gatus'
 import { HEALTH_WORD, healthOf, historyOf, historyStart, millis, percent } from '@/lib/health'

@@ -1,6 +1,6 @@
 @.conventions/CLAUDE.md
 
-# vexoulz-status
+# vex-status
 
 status.vexoul.net: service health, uptime, response times and outages, over the API of a Gatus
 instance that keeps doing the checks. Published by `publish.yml` to the `deploy` branch.

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // One service: uptime and average response over every period, its last hundred checks (pick one to see it in
 // full), their response times, and its outages from Gatus's events.
-import { VxButton, VxCallout, VxEmptyState, VxSkeleton, VxStatusDot, VxUptimeBar } from '@vexoulz/ui'
+import { VxButton, VxCallout, VxEmptyState, VxSkeleton, VxStatusDot, VxUptimeBar } from '@vex/ui'
 import { computed, ref, watch } from 'vue'
 import ResponseChart from '@/components/ResponseChart.vue'
 import StatusShell from '@/components/StatusShell.vue'

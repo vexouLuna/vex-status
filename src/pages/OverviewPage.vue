@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // Everything at once: one line for the whole network, Gatus's announcements, then every service by group with its
 // history over the chosen period. The period and the filter live in the URL (?period=7d&show=trouble), so a link shows the same view.
-import { VxButton, VxCallout, VxEmptyState, VxSegmented, VxSkeleton, VxStatusDot } from '@vexoulz/ui'
-import { useNow } from '@vexoulz/ui/utils'
+import { VxButton, VxCallout, VxEmptyState, VxSegmented, VxSkeleton, VxStatusDot } from '@vex/ui'
+import { useNow } from '@vex/ui/utils'
 import { computed, reactive, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EndpointRow from '@/components/EndpointRow.vue'

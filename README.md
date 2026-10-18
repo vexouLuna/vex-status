@@ -1,7 +1,7 @@
 # status.vexoul.net
 
 Service health for the vexoul.net sites: whether each service is up, its uptime and response times, and its
-outages. Vue 3 + TypeScript on the shared [`@vexoulz/ui`](https://github.com/vEXOULZ/vexoulz-ui) design, over the
+outages. Vue 3 + TypeScript on the shared [`@vex/ui`](https://github.com/vexouLuna/vex-ui) design, over the
 API of a [Gatus](https://github.com/TwiN/gatus) instance, which keeps doing the checks. It replaces Gatus's own pages.
 
 ```bash
@@ -28,7 +28,7 @@ git config core.hooksPath .conventions/githooks   # once per clone: branch-name 
 
 Gatus lists services by key, so the order is set here (`groupsOf` in `src/lib/health.ts`): groups `websites`,
 `API`, `infrastructure`, then any other group alphabetically; within a group, by where the checked host (the first
-result's `hostname`, not the display name) sits in `@vexoulz/ui`'s `SITES`, then by name, with other hosts last.
+result's `hostname`, not the display name) sits in `@vex/ui`'s `SITES`, then by name, with other hosts last.
 
 The front page's bars show the chosen period in slots: 60 × 1 min, 48 × 30 min, 42 × 4 h or 30 × 1 day. A slot is
 down when one of Gatus's outages (its UNHEALTHY to HEALTHY events) overlaps it, unstable when a check in it failed
@@ -59,8 +59,8 @@ Gatus's address in `.env.local`.
 ## Publishing
 
 `.github/workflows/publish.yml` builds and pushes `dist/` to the `deploy` branch on every merge to `main`.
-`@vexoulz/ui` is pinned to a git tag in `package.json`, and Renovate opens the bumps. The site stays out of the
-other sites' navigation (`hidden: true` on its `SITES` entry in `@vexoulz/ui`) until it's live.
+`@vex/ui` is pinned to a git tag in `package.json`, and Renovate opens the bumps. The site stays out of the
+other sites' navigation (`hidden: true` on its `SITES` entry in `@vex/ui`) until it's live.
 
 ## Infrastructure
 
@@ -71,5 +71,5 @@ repo and must never be committed here. `.gitignore` blocks `.env*` (except `.env
 
 ## Assets
 
-No images of its own yet. `public/favicon.ico` is vexoul.net's; the header mark is `@vexoulz/ui`'s placeholder
+No images of its own yet. `public/favicon.ico` is vexoul.net's; the header mark is `@vex/ui`'s placeholder
 like the other sites'. Still needed: a status favicon and logo, if it should have its own.

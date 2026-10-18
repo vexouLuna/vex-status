@@ -1,5 +1,5 @@
 {
-  "name": "vexoulz-status",
+  "name": "vex-status",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@vexoulz/ui": "github:vEXOULZ/vexoulz-ui#v0.24.1",
+    "@vex/ui": "github:vexouLuna/vex-ui#v0.28.0",
     "vue": "^3.5.43",
     "vue-router": "^4.6.4"
   },

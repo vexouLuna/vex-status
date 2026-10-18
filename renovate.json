@@ -1,8 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>vEXOULZ/conventions//renovate/default"],
+  "extends": ["github>vexouLuna/conventions//renovate/default"],
   "packageRules": [
     { "matchUpdateTypes": ["minor", "patch"], "matchDepTypes": ["devDependencies"], "groupName": "dev dependencies (non-major)" },
-    { "matchPackageNames": ["@vexoulz/ui", "vEXOULZ/vexoulz-ui"], "groupName": "vexoulz packages", "description": "Tagged git releases of the shared design." }
+    { "matchPackageNames": ["@vex/ui", "vexouLuna/vex-ui"], "groupName": "vex packages", "description": "Tagged git releases of the shared design." }
   ]
 }

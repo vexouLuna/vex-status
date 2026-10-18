@@ -2,7 +2,7 @@
 // away when it becomes visible again (the library's usePoll). A failed refresh keeps the last answer and sets
 // `error` to its message, so the page can say it's stale instead of going blank. Reloads from scratch when
 // `source` changes (a route param).
-import { usePoll } from '@vexoulz/ui/utils'
+import { usePoll } from '@vex/ui/utils'
 import { computed, type WatchSource } from 'vue'
 import { errorMessage } from './gatus'
 

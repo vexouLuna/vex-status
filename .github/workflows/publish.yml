@@ -13,6 +13,6 @@ concurrency:
 
 jobs:
   publish:
-    uses: vEXOULZ/conventions/.github/workflows/publish-site.yml@v2.1.0
+    uses: vexouLuna/conventions/.github/workflows/publish-site.yml@v2.1.1
     permissions:
       contents: write
