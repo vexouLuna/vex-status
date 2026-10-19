@@ -1,0 +1,1 @@
+import{d as n,j as o,u as e,w as t,K as r,b as c,L as l,M as u,o as _}from"./index-CqBrecVO.js";const i=n({__name:"StatusShell",setup(p){const a=[{label:"Services",to:"/"}];return(s,d)=>(_(),o(e(u),{site:"status",nav:a},{account:t(()=>[c(e(l))]),default:t(()=>[r(s.$slots,"default")]),_:3}))}});export{i as _};
