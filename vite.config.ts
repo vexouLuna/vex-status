@@ -16,9 +16,11 @@ function commit(): string {
 export default defineConfig(({ mode }) => {
   // Env files next to this config, not in process.cwd(): `vite <dir>` can be started from another folder.
   const env = loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), '')
+  // The page's name, in the tab and over the services (VITE_STATUS_TITLE in .env.example).
+  const title = env.VITE_STATUS_TITLE || 'vexoul.net status'
   return {
-    define: { __COMMIT__: JSON.stringify(commit()) },
-    plugins: [vue()],
+    define: { __COMMIT__: JSON.stringify(commit()), __TITLE__: JSON.stringify(title) },
+    plugins: [vue(), { name: 'status-title', transformIndexHtml: (html) => html.replace('%STATUS_TITLE%', title) }],
     resolve: {
       alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
     },

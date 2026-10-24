@@ -1,14 +1,15 @@
 <script setup lang="ts">
-// One service on the front page: its state, uptime and average response over the chosen period, and its history
-// over that period as a bar. The name opens the service's own page.
-import { VxStatusDot, VxUptimeBar } from '@vex/ui'
+// One service on the front page: its state, uptime and average response over the chosen range, and its history
+// over that range as a grid. The name opens the service's own page.
+import { VxStatusDot } from '@vex/ui'
 import { computed } from 'vue'
-import type { EndpointStatus, Period } from '@/lib/gatus'
-import { HEALTH_WORD, healthOf, historyOf, historyStart, millis, percent } from '@/lib/health'
+import UptimeGrid from '@/components/UptimeGrid.vue'
+import type { EndpointStatus } from '@/lib/gatus'
+import { HEALTH_WORD, gridOf, gridStart, healthOf, millis, percent, type Range } from '@/lib/health'
 
 const props = defineProps<{
   endpoint: EndpointStatus
-  period: Period
+  range: Range
   uptime?: number | null
   responseTime?: number | null
   /** When the data was fetched: the bar ends there. */
@@ -16,8 +17,8 @@ const props = defineProps<{
 }>()
 
 const health = computed(() => healthOf(props.endpoint.results))
-const ticks = computed(() => historyOf(props.endpoint.results, props.endpoint.events, props.period, props.now))
-const start = computed(() => historyStart(props.period, props.now))
+const columns = computed(() => gridOf(props.endpoint.results, props.endpoint.events, props.range, props.now))
+const start = computed(() => gridStart(props.range, props.now))
 </script>
 
 <template>
@@ -29,11 +30,12 @@ const start = computed(() => historyStart(props.period, props.now))
       <span class="ep-word small" :class="`is-${health}`">{{ HEALTH_WORD[health] }}</span>
       <span class="ep-spacer"></span>
       <span class="ep-nums vx-mono small">
-        <span :title="`Uptime over the last ${period}`"><span class="vx-muted">{{ period }}</span> {{ percent(uptime) }}</span>
-        <span :title="`Average response over the last ${period}`"><span class="vx-muted">avg</span> {{ millis(responseTime) }}</span>
+        <span :title="range === '1y' ? 'Uptime over the last year, from the outages on record' : `Uptime over the last ${range}`"><span class="vx-muted">{{ range }}</span> {{ percent(uptime) }}</span>
+        <!-- Gatus keeps no response times past 30 days. -->
+        <span v-if="range !== '1y'" :title="`Average response over the last ${range}`"><span class="vx-muted">avg</span> {{ millis(responseTime) }}</span>
       </span>
     </div>
-    <VxUptimeBar :ticks="ticks" :label="`${endpoint.name}, last ${period}`" />
+    <UptimeGrid :columns="columns" :label="`${endpoint.name}, last ${range}`" />
     <div class="ep-axis vx-mono small vx-muted" aria-hidden="true">
       <span>{{ start }}</span>
       <span>now</span>
