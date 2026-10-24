@@ -1,36 +1,30 @@
 <script setup lang="ts">
 // One service: uptime and average response over every period, its last hundred checks (pick one to see it in
-// full), their response times, and its outages from Gatus's events.
+// full), their response times, and its outages from Gatus's events. The checks are polled; the numbers are fetched
+// again only when due (useNumbers), or on Refresh.
 import { VxButton, VxCallout, VxEmptyState, VxSkeleton, VxStatusDot, VxUptimeBar } from '@vex/ui'
 import { computed, ref, watch } from 'vue'
 import ResponseChart from '@/components/ResponseChart.vue'
 import StatusShell from '@/components/StatusShell.vue'
-import { PERIODS, gatus, type Period } from '@/lib/gatus'
+import { PERIODS, gatus } from '@/lib/gatus'
 import { HEALTH_WORD, dateTime, failureOf, healthOf, incidentsOf, millis, ms, percent, ticksOf } from '@/lib/health'
 import { useLive } from '@/lib/useLive'
+import { useNumbers } from '@/lib/useNumbers'
 
 const props = defineProps<{ endpointKey: string }>()
 
-const live = useLive(async () => {
-  const [endpoint, numbers] = await Promise.all([
-    gatus.endpoint(props.endpointKey),
-    Promise.all(
-      PERIODS.map(async (p) => {
-        const [uptime, responseTime] = await Promise.all([
-          gatus.uptime(props.endpointKey, p).catch(() => null),
-          gatus.responseTime(props.endpointKey, p).catch(() => null),
-        ])
-        return [p, { uptime, responseTime }] as const
-      }),
-    ),
-  ])
-  return { endpoint, numbers: new Map<Period, { uptime: number | null; responseTime: number | null }>(numbers) }
-}, () => props.endpointKey)
+const live = useLive(() => gatus.endpoint(props.endpointKey), () => props.endpointKey)
+const numbers = useNumbers()
+watch([() => props.endpointKey, live.updated], () => void numbers.load([props.endpointKey], PERIODS))
+function refresh() {
+  void live.reload()
+  void numbers.load([props.endpointKey], PERIODS, true)
+}
 
 // Gatus answers 404 for a key it doesn't know.
 const notFound = computed(() => !live.data.value && /^404/.test(live.error.value ?? ''))
 
-const ep = computed(() => live.data.value?.endpoint ?? null)
+const ep = computed(() => live.data.value ?? null)
 const results = computed(() => ep.value?.results ?? [])
 const health = computed(() => healthOf(results.value))
 const ticks = computed(() => ticksOf(results.value))
@@ -80,14 +74,14 @@ const check = computed(() => results.value[selected.value ?? results.value.lengt
               {{ HEALTH_WORD[health] }}<template v-if="results.length"> · last checked {{ dateTime(results.at(-1)!.timestamp) }}</template>
             </p>
           </div>
-          <VxButton size="sm" :disabled="live.loading.value" @click="live.reload()">Refresh</VxButton>
+          <VxButton size="sm" :disabled="live.loading.value" @click="refresh()">Refresh</VxButton>
         </div>
 
         <div class="tiles">
           <div v-for="p in PERIODS" :key="p" class="tile vx-panel">
             <div class="vx-eyebrow">last {{ p }}</div>
-            <div class="tile-main vx-mono">{{ percent(live.data.value?.numbers.get(p)?.uptime) }}</div>
-            <div class="vx-muted small vx-mono">avg {{ millis(live.data.value?.numbers.get(p)?.responseTime) }}</div>
+            <div class="tile-main vx-mono">{{ percent(numbers.get(endpointKey, p)?.uptime) }}</div>
+            <div class="vx-muted small vx-mono">avg {{ millis(numbers.get(endpointKey, p)?.responseTime) }}</div>
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CheckResult, EndpointStatus } from '../src/lib/gatus'
-import { announcementTone, failureOf, groupsOf, healthOf, historyOf, incidentsOf, outagesOf, overallOf, percent, span, ticksOf } from '../src/lib/health'
+import { announcementTone, failureOf, groupsOf, healthOf, gridOf, gridStart, incidentsOf, outagesOf, overallOf, percent, span, ticksOf, yearUptimeOf } from '../src/lib/health'
 
 const ok = (t = '2026-09-28T12:00:00Z'): CheckResult => ({ status: 200, duration: 21e6, success: true, timestamp: t })
 const bad = (extra: Partial<CheckResult> = {}): CheckResult => ({ status: 502, duration: 5e6, success: false, timestamp: '2026-09-28T12:01:00Z', ...extra })
@@ -66,32 +66,70 @@ describe('outagesOf', () => {
   })
 })
 
-describe('historyOf', () => {
-  // Local time, since slots line up on local midnight.
-  const now = new Date(2026, 8, 28, 12, 0, 30).getTime()
-  const iso = (h: number, m = 0, s = 0) => new Date(2026, 8, 28, h, m, s).toISOString()
-  it('has a slot per period step, the last holding now', () => {
-    expect(historyOf([], [], '1h', now)).toHaveLength(60)
-    expect(historyOf([], [], '24h', now)).toHaveLength(48)
-    expect(historyOf([], [], '7d', now)).toHaveLength(42)
-    expect(historyOf([], [], '30d', now)).toHaveLength(30)
+describe('gridOf', () => {
+  // Local time, since cells and columns sit on the local calendar. Mon 28 Sep 2026, 12:37:30.
+  const now = new Date(2026, 8, 28, 12, 37, 30).getTime()
+  const at = (d: number, h: number, m = 0, s = 0) => new Date(2026, 8, d, h, m, s).toISOString()
+  const flat = (cols: ReturnType<typeof gridOf>) => cols.flat().filter((c) => c.status !== 'none')
+  it('has every cell of the range, in calendar columns with a partial first and last', () => {
+    const shape = (r: Parameters<typeof gridOf>[2]) => {
+      const g = gridOf([], [], r, now)
+      return [g.length, g[0]!.length, flat(g).length]
+    }
+    expect(shape('1h')).toEqual([13, 5, 60]) // 11:38..12:37: columns 11:35..12:35
+    expect(shape('24h')).toEqual([25, 4, 96]) // yesterday 12:45..12:30 today
+    expect(shape('7d')).toEqual([29, 6, 168])
+    expect(shape('30d')).toEqual([31, 4, 120])
+    const year = gridOf([], [], '1y', now)
+    expect(year[0]!.length).toBe(7)
+    expect(flat(year)).toHaveLength(365)
+    expect(year.at(-1)!.findIndex((c) => c.status === 'none')).toBe(2) // today is a Monday: Tue–Sat still to come
   })
-  it('is off before checking began, down over an outage, unstable on a stray failure', () => {
+  it('weeks start on Sunday', () => {
+    const year = gridOf([], [{ type: 'START', timestamp: at(1, 0) }], '1y', now)
+    const last = year.at(-1)!
+    expect(last[0]!.label).toMatch(/Sep 27/) // Sunday
+    expect(last[1]!.label).toMatch(/Sep 28/)
+    expect(gridStart('1y', now)).toMatch(/Sep 29|Sept 29/) // in 2025, 364 days back
+  })
+  it('colours a cell by how much of it an outage took', () => {
     const events = [
-      { type: 'START' as const, timestamp: iso(6) },
-      { type: 'HEALTHY' as const, timestamp: iso(6) },
-      { type: 'UNHEALTHY' as const, timestamp: iso(9, 10) },
-      { type: 'HEALTHY' as const, timestamp: iso(9, 25) },
+      { type: 'START' as const, timestamp: at(28, 6) },
+      { type: 'HEALTHY' as const, timestamp: at(28, 6) },
+      { type: 'UNHEALTHY' as const, timestamp: at(28, 9, 0) },
+      { type: 'HEALTHY' as const, timestamp: at(28, 9, 5) }, // 5 of 09:00–09:15
+      { type: 'UNHEALTHY' as const, timestamp: at(28, 9, 15) },
+      { type: 'HEALTHY' as const, timestamp: at(28, 9, 26) }, // 11 of 09:15–09:30: over two thirds
+      { type: 'UNHEALTHY' as const, timestamp: at(28, 9, 30) },
+      { type: 'HEALTHY' as const, timestamp: at(28, 9, 45) }, // all of 09:30–09:45
     ]
-    const results = [{ ...bad(), timestamp: iso(11, 50, 5) }, { ...ok(), timestamp: iso(12, 0, 5) }]
-    const h = historyOf(results, events, '24h', now)
-    // Slots are half-hours; the last starts at 12:00, so index 47 - 2k is k hours earlier.
-    expect(h[47 - 12]!.status).toBe('ok') // 06:00–06:30: checking began at its start
-    expect(h[47 - 13]!.status).toBe('off') // 05:30–06:00: before it
-    expect(h[47 - 6]!.status).toBe('down') // 09:00–09:30 holds the outage
-    expect(h[47 - 6]!.label).toMatch(/down 15 min$/)
-    expect(h[46]!.status).toBe('warn') // 11:30–12:00 holds the failed check
-    expect(h[47]!.status).toBe('ok')
+    const results = [{ ...bad(), timestamp: at(28, 12, 20, 5) }, { ...ok(), timestamp: at(28, 12, 36, 5) }]
+    const g = gridOf(results, events, '24h', now)
+    const col = (h: number) => g.at(-1 - (12 - h))!
+    expect(col(9).map((c) => c.status)).toEqual(['partial', 'caution', 'down', 'ok'])
+    expect(col(9)[0]!.label).toMatch(/down 5 min \(33%\)$/)
+    expect(col(9)[2]!.label).toMatch(/down 15 min$/)
+    expect(col(5)[3]!.status).toBe('off') // 05:45–06:00: before checks began
+    expect(col(12).map((c) => c.status)).toEqual(['ok', 'warn', 'ok', 'none'])
+  })
+  it("shows no record, not an outage, before the oldest event Gatus kept", () => {
+    const g = gridOf([], [{ type: 'HEALTHY', timestamp: at(28, 8) }], '24h', now)
+    expect(g.at(-6)![3]!.label).toMatch(/no record$/) // 07:45
+    expect(g.at(-6)![3]!.status).toBe('off')
+    expect(flat(g).some((c) => c.status === 'down' || c.status === 'caution' || c.status === 'partial')).toBe(false)
+  })
+})
+
+describe('yearUptimeOf', () => {
+  it('is the share of the record not in an outage', () => {
+    const now = Date.UTC(2026, 8, 28, 12)
+    const events = [
+      { type: 'START' as const, timestamp: new Date(now - 10 * 3_600_000).toISOString() },
+      { type: 'UNHEALTHY' as const, timestamp: new Date(now - 2 * 3_600_000).toISOString() },
+      { type: 'HEALTHY' as const, timestamp: new Date(now - 3_600_000).toISOString() },
+    ]
+    expect(yearUptimeOf(events, now)).toBeCloseTo(0.9)
+    expect(yearUptimeOf(undefined, now)).toBeNull()
   })
 })
 
