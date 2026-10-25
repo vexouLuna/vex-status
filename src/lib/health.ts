@@ -1,19 +1,22 @@
 // What the checks mean: a service's health, the whole network's, and the words and numbers the pages show.
 // Pure functions of Gatus's answers, so they are tested without a browser.
 import { SITES, type Health, type Tone, type UptimeTick } from '@vex/ui'
-import type { Announcement, CheckResult, EndpointEvent, EndpointStatus, Period } from './gatus'
+import { PERIODS, type Announcement, type CheckResult, type EndpointEvent, type EndpointStatus, type Period } from './gatus'
 
 export const ms = (r: CheckResult) => r.duration / 1e6
 
+/** The states a service's checks can put it in (Health also has `caution`, which only outages' share sets). */
+export type CheckHealth = Extract<Health, 'ok' | 'warn' | 'down' | 'off'>
+
 /** A service is down when its latest check failed, unstable when an earlier one in view did, up otherwise. */
-export function healthOf(results: CheckResult[]): Health {
+export function healthOf(results: CheckResult[]): CheckHealth {
   const last = results.at(-1)
   if (!last) return 'off'
   if (!last.success) return 'down'
   return results.some((r) => !r.success) ? 'warn' : 'ok'
 }
 
-export const HEALTH_WORD: Record<Health, string> = { ok: 'Up', warn: 'Unstable', down: 'Down', off: 'No data' }
+export const HEALTH_WORD: Record<CheckHealth, string> = { ok: 'Up', warn: 'Unstable', down: 'Down', off: 'No data' }
 
 export interface Overall {
   health: Health
@@ -36,8 +39,10 @@ export interface Group {
   endpoints: EndpointStatus[]
 }
 
-/** Groups in this order; any other group after them, alphabetically, and ungrouped ones last. */
-export const GROUP_ORDER = ['websites', 'API', 'infrastructure']
+/** Groups in this order (VITE_STATUS_GROUPS, for another Gatus's groups); any other group after them,
+ * alphabetically, and ungrouped ones last. */
+const groupsEnv = (import.meta.env.VITE_STATUS_GROUPS ?? '').split(',').map((g) => g.trim()).filter(Boolean)
+export const GROUP_ORDER = groupsEnv.length ? groupsEnv : ['websites', 'API', 'infrastructure']
 
 const groupRank = (g: string) => {
   const i = GROUP_ORDER.indexOf(g)
@@ -138,14 +143,6 @@ export function incidentsOf(events: EndpointEvent[] = [], now = Date.now()): Inc
 export const announcementTone = (a: Announcement): Tone =>
   a.type === 'outage' ? 'error' : a.type === 'warning' ? 'warn' : a.type === 'operational' ? 'ok' : 'info'
 
-/** The history bar for each period: how many slots, and how long each one is. */
-export const HISTORY: Record<Period, { slots: number; size: number }> = {
-  '1h': { slots: 60, size: 60_000 },
-  '24h': { slots: 48, size: 30 * 60_000 },
-  '7d': { slots: 42, size: 4 * 3_600_000 },
-  '30d': { slots: 30, size: 86_400_000 },
-}
-
 /** How long a service's uptime and average response over a period stay fresh: a minute's checks barely move a long
  * period's numbers, so the longer the period, the less often they're fetched again. */
 export const NUMBERS_TTL: Record<Period, number> = {
@@ -155,26 +152,78 @@ export const NUMBERS_TTL: Record<Period, number> = {
   '30d': 6 * 3_600_000,
 }
 
-const dayShort = (t: number) => new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' })
-/** A slot's time as a label: "14:05", "14:00–14:30", "Sep 27, 08:00–12:00", "Sep 27". */
-function slotLabel(start: number, size: number): string {
-  if (size <= 60_000) return clock(start)
-  if (size >= 86_400_000) return dayShort(start)
-  const range = `${clock(start)}–${clock(start + size)}`
-  return size > 3_600_000 ? `${dayShort(start)}, ${range}` : range
+/** The front page's ranges: Gatus's uptime periods, and a year, which Gatus has no uptime for (see yearUptimeOf). */
+export const RANGES = [...PERIODS, '1y'] as const
+export type Range = (typeof RANGES)[number]
+
+/** A length of calendar time in local time: n minutes, n hours, a day or a week (from Sunday). */
+interface Step {
+  unit: 'min' | 'hour' | 'day' | 'week'
+  n: number
 }
-/** Where the history bar for a period starts, for the axis under it. */
-export const historyStart = (period: Period, now: number) => {
-  const first = slotStarts(period, now)[0]!
-  return HISTORY[period].size >= 3_600_000 ? dayShort(first) : clock(first)
+const MIN = (n: number): Step => ({ unit: 'min', n })
+const HOUR = (n: number): Step => ({ unit: 'hour', n })
+const DAY: Step = { unit: 'day', n: 1 }
+const WEEK: Step = { unit: 'week', n: 1 }
+
+/** The start of the step holding `t`: 14:37 floors to 14:35 in 5-minute steps, any day to its Sunday in weeks. */
+function floorTo(t: number, { unit, n }: Step): number {
+  const d = new Date(t)
+  if (unit === 'min') d.setMinutes(Math.floor(d.getMinutes() / n) * n, 0, 0)
+  else if (unit === 'hour') d.setHours(Math.floor(d.getHours() / n) * n, 0, 0, 0)
+  else {
+    d.setHours(0, 0, 0, 0)
+    if (unit === 'week') d.setDate(d.getDate() - d.getDay())
+  }
+  return d.getTime()
+}
+/** `t` moved by k steps, on the calendar (a day is a date, not 24 h, across a clock change). */
+function add(t: number, { unit, n }: Step, k: number): number {
+  const d = new Date(t)
+  if (unit === 'min') d.setMinutes(d.getMinutes() + n * k)
+  else if (unit === 'hour') d.setHours(d.getHours() + n * k)
+  else d.setDate(d.getDate() + (unit === 'week' ? 7 : 1) * n * k)
+  return d.getTime()
 }
 
-/** Slot starts, lined up on local midnight so they read as round times, the last one holding `now`. */
-function slotStarts(period: Period, now: number): number[] {
-  const { slots, size } = HISTORY[period]
-  const midnight = new Date(now).setHours(0, 0, 0, 0)
-  const last = midnight + Math.floor((now - midnight) / size) * size
-  return Array.from({ length: slots }, (_, i) => last - (slots - 1 - i) * size)
+/**
+ * Each range's grid: `cells` cells of `cell` time ending with the one that holds now, stacked `rows` to a column of
+ * `column` time. Columns sit on the calendar like GitHub's weeks from Sunday, so the first and last are partial.
+ */
+export const GRID: Record<Range, { cells: number; cell: Step; column: Step; rows: number }> = {
+  '1h': { cells: 60, cell: MIN(1), column: MIN(5), rows: 5 },
+  '24h': { cells: 96, cell: MIN(15), column: HOUR(1), rows: 4 },
+  '7d': { cells: 168, cell: HOUR(1), column: HOUR(6), rows: 6 },
+  '30d': { cells: 120, cell: HOUR(6), column: DAY, rows: 4 },
+  '1y': { cells: 365, cell: DAY, column: WEEK, rows: 7 },
+}
+
+/**
+ * A cell's state: Health, plus how much of it an outage took: `partial` up to two thirds, `caution` above that,
+ * `down` all of it. `none` is a place in a partial column outside the range (before it, or still to come).
+ */
+export type CellStatus = Health | 'partial' | 'caution' | 'none'
+export interface GridCell {
+  status: CellStatus
+  label?: string
+}
+
+const dayShort = (t: number) => new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' })
+const dayLong = (t: number) => new Date(t).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+/** A cell's time as a label: "14:05", "14:00–14:15", "Sep 27, 08:00–09:00", "Sun, Sep 27, 2026". */
+function cellLabel(start: number, end: number, { unit, n }: Step): string {
+  if (unit === 'min' && n === 1) return clock(start)
+  if (unit === 'day' || unit === 'week') return dayLong(start)
+  const range = `${clock(start)}–${clock(end)}`
+  return unit === 'hour' ? `${dayShort(start)}, ${range}` : range
+}
+
+/** Where the grid for a range starts, for the axis under it. */
+export function gridStart(range: Range, now: number): string {
+  const { cells, cell } = GRID[range]
+  const first = add(floorTo(now, cell), cell, 1 - cells)
+  if (cell.unit === 'min') return clock(first)
+  return range === '1y' ? new Date(first).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : dayShort(first)
 }
 
 /**
@@ -201,31 +250,69 @@ export function outagesOf(events: EndpointEvent[] = [], now = Date.now()): { sin
 }
 
 /**
- * A service's history over a period as bar ticks, oldest first. A slot is down when an outage (Gatus's
- * UNHEALTHY to HEALTHY) overlaps it, unstable when a check in it failed without making an outage, no data when
- * it's from before checking began, and up otherwise. Checks are only known for the latest hundred minutes or so;
- * outages for as far back as Gatus keeps its events.
+ * What's known of a service's outages: from when (checking began, or the oldest event Gatus still keeps), and the
+ * outage stretches. Before `known` there's no record: when Gatus has dropped the oldest events, how long the
+ * state before them lasted is lost, so it isn't drawn as an outage running back forever. Without events (they
+ * failed to load), only the checks shown are known.
  */
-export function historyOf(results: CheckResult[], events: EndpointEvent[] | undefined, period: Period, now = Date.now()): UptimeTick[] {
-  const { size } = HISTORY[period]
-  // Without events (they failed to load), checking began no later than the oldest check shown.
-  const { since, down } = events
-    ? outagesOf(events, now)
-    : { since: results[0] ? Date.parse(results[0].timestamp) : now, down: [] as [number, number][] }
-  return slotStarts(period, now).map((start) => {
-    const end = Math.min(start + size, now)
-    const when = slotLabel(start, size)
-    if (end <= since) return { status: 'off', label: `${when} · not checked yet` }
-    const from = Math.max(start, since)
-    const downMs = down.reduce((sum, [a, b]) => sum + Math.max(0, Math.min(b, end) - Math.max(a, from)), 0)
-    const inSlot = results.filter((r) => {
-      const t = Date.parse(r.timestamp)
-      return t >= start && t < start + size
-    })
-    const failed = inSlot.filter((r) => !r.success).length
-    if (downMs > 0) return { status: 'down', label: `${when} · down ${span(downMs)}` }
-    if (failed) return { status: 'warn', label: `${when} · ${failed} failed ${failed === 1 ? 'check' : 'checks'}` }
-    if (inSlot.length === 1 && size <= 60_000) return { status: 'ok', label: ticksOf(inSlot)[0]!.label }
-    return { status: 'ok', label: `${when} · up` }
-  })
+function recordOf(results: CheckResult[], events: EndpointEvent[] | undefined, now: number) {
+  if (!events) return { known: results[0] ? Date.parse(results[0].timestamp) : now, started: true, down: [] as [number, number][] }
+  const { since, down } = outagesOf(events, now)
+  const started = since > -Infinity
+  return { known: started ? since : events[0] ? Date.parse(events[0].timestamp) : now, started, down }
+}
+const downIn = (down: [number, number][], from: number, end: number) =>
+  down.reduce((sum, [a, b]) => sum + Math.max(0, Math.min(b, end) - Math.max(a, from)), 0)
+
+/**
+ * A service's history over a range as grid columns, oldest first, each `rows` cells from the top. A cell is down,
+ * caution or partial by how much of it an outage (Gatus's UNHEALTHY to HEALTHY) took, unstable when a check in it
+ * failed without making an outage, no data before the record begins, and up otherwise. Checks are only known
+ * for the latest hundred minutes or so; outages for as far back as Gatus keeps its events.
+ */
+export function gridOf(results: CheckResult[], events: EndpointEvent[] | undefined, range: Range, now = Date.now()): GridCell[][] {
+  const { cells, cell, column, rows } = GRID[range]
+  const last = floorTo(now, cell)
+  const first = add(last, cell, 1 - cells)
+  const { known, started, down } = recordOf(results, events, now)
+  const columns: GridCell[][] = []
+  for (let col = floorTo(first, column); col <= last; col = add(col, column, 1)) {
+    const next = add(col, column, 1)
+    // shortcut: a column the clock change makes one cell longer drops that cell; fine twice a year.
+    columns.push(
+      Array.from({ length: rows }, (_, row): GridCell => {
+        const start = add(col, cell, row)
+        if (start < first || start > last || start >= next) return { status: 'none' }
+        const stop = add(start, cell, 1)
+        const end = Math.min(stop, now)
+        const when = cellLabel(start, stop, cell)
+        if (end <= known) return { status: 'off', label: `${when} · ${started ? 'not checked yet' : 'no record'}` }
+        const from = Math.max(start, known)
+        const downMs = downIn(down, from, end)
+        if (downMs > 0) {
+          const ratio = downMs / (end - from)
+          const status = ratio >= 1 ? 'down' : ratio > 2 / 3 ? 'caution' : 'partial'
+          return { status, label: `${when} · down ${span(downMs)}${status === 'down' ? '' : ` (${Math.max(1, Math.round(ratio * 100))}%)`}` }
+        }
+        const inCell = results.filter((r) => {
+          const t = Date.parse(r.timestamp)
+          return t >= start && t < stop
+        })
+        const failed = inCell.filter((r) => !r.success).length
+        if (failed) return { status: 'warn', label: `${when} · ${failed} failed ${failed === 1 ? 'check' : 'checks'}` }
+        if (inCell.length === 1 && cell.unit === 'min' && cell.n === 1) return { status: 'ok', label: ticksOf(inCell)[0]!.label }
+        return { status: 'ok', label: `${when} · up` }
+      }),
+    )
+  }
+  return columns
+}
+
+/** Uptime over the year's grid, from outages alone: Gatus keeps no uptime past 30 days. null with no record. */
+export function yearUptimeOf(events: EndpointEvent[] | undefined, now = Date.now()): number | null {
+  if (!events?.length) return null
+  const { cells, cell } = GRID['1y']
+  const { known, down } = recordOf([], events, now)
+  const from = Math.max(add(floorTo(now, cell), cell, 1 - cells), known)
+  return now > from ? 1 - downIn(down, from, now) / (now - from) : null
 }
