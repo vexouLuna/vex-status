@@ -1,11 +1,10 @@
 /* Site-level additions on top of @vex/ui. Keep this small; shared styles belong in the library. */
 
-.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 20px; }
-.page-head h1.vx-display { font-size: 30px; margin: 6px 0 4px; display: flex; align-items: center; gap: 12px; }
 .sec { font-size: 18px; margin: 32px 0 12px; }
 .small { font-size: 12px; }
 .stack { display: flex; flex-direction: column; gap: 12px; }
 .row { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
 
 /* The big dot in a page title. */
+.big-dot { vertical-align: middle; margin: -0.15em 12px 0 0; }
 .big-dot .vx-status-dot { width: 14px; height: 14px; }

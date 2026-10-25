@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Everything at once: one line for the whole network, Gatus's announcements, then every service by group with its
 // history over the chosen range. The range and the filter live in the URL (?period=7d&show=trouble), so a link shows the same view.
-import { VxButton, VxCallout, VxEmptyState, VxSegmented, VxSkeleton, VxStatusDot } from '@vex/ui'
+import { VxButton, VxCallout, VxEmptyState, VxLoadState, VxPageHead, VxSegmented, VxStatusDot } from '@vex/ui'
 import { useNow } from '@vex/ui/utils'
 import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -71,20 +71,17 @@ const showOptions = [
 
 <template>
   <StatusShell>
-    <div class="page-head">
-      <div>
-        <div class="vx-eyebrow">{{ TITLE }}</div>
-        <h1 class="vx-display" aria-live="polite">
+    <VxPageHead :eyebrow="TITLE" title="">
+      <template #title>
+        <span aria-live="polite">
           <template v-if="live.data.value"><VxStatusDot class="big-dot" :status="overall.health" />{{ overall.title }}</template>
           <template v-else-if="live.error.value">Status unknown</template>
           <template v-else>Checking…</template>
-        </h1>
-        <p class="vx-muted small head-note">
-          Every service is checked once a minute.<template v-if="ago"> Updated {{ ago }}.</template>
-        </p>
-      </div>
-      <VxButton size="sm" :disabled="live.loading.value" @click="refresh()">Refresh</VxButton>
-    </div>
+        </span>
+      </template>
+      <template #actions><VxButton size="sm" :disabled="live.loading.value" @click="refresh()">Refresh</VxButton></template>
+      Every service is checked once a minute.<template v-if="ago"> Updated {{ ago }}.</template>
+    </VxPageHead>
 
     <div v-if="announcements.length" class="stack announcements">
       <VxCallout v-for="a in announcements" :key="a.timestamp + a.message" :tone="announcementTone(a)">
@@ -93,7 +90,7 @@ const showOptions = [
       </VxCallout>
     </div>
 
-    <VxCallout v-if="live.error.value" :tone="live.data.value ? 'warn' : 'error'" :title="live.data.value ? `Couldn't refresh, showing the checks from ${ago}` : `Couldn't load the checks`" class="err">
+    <VxCallout v-if="live.error.value && live.data.value" tone="warn" :title="`Couldn't refresh, showing the checks from ${ago}`" class="err">
       {{ live.error.value }}
       <template #actions><VxButton size="sm" @click="live.reload()">Try again</VxButton></template>
     </VxCallout>
@@ -112,35 +109,43 @@ const showOptions = [
       <li><i class="is-off"></i>no record</li>
     </ul>
 
-    <div v-if="!live.data.value && !live.error.value" class="stack" aria-busy="true">
-      <VxSkeleton v-for="i in 4" :key="i" h="84px" />
+    <div class="content">
+      <VxLoadState
+        :error="live.data.value ? undefined : live.error.value"
+        error-title="Couldn't load the checks"
+        :loading="!live.data.value"
+        :empty="!visible.length"
+        row-height="84px"
+        @retry="live.reload()"
+      >
+        <template #empty>
+          <VxEmptyState
+            :title="show === 'trouble' ? 'Everything is up' : 'Nothing is checked yet'"
+            :text="show === 'trouble' ? 'No service has failed a check lately.' : undefined"
+          >
+            <template v-if="show === 'trouble'" #actions><VxButton @click="show = 'all'">Show all services</VxButton></template>
+          </VxEmptyState>
+        </template>
+        <section v-for="g in groups" :key="g.name">
+          <h2 class="vx-display sec">{{ g.name || 'Other' }}</h2>
+          <div class="stack">
+            <EndpointRow
+              v-for="e in g.endpoints"
+              :key="e.key"
+              :endpoint="e"
+              :range="period"
+              :uptime="numbersOf(e)?.uptime"
+              :response-time="numbersOf(e)?.responseTime"
+              :now="live.updated.value ?? now"
+            />
+          </div>
+        </section>
+      </VxLoadState>
     </div>
-    <VxEmptyState
-      v-else-if="live.data.value && !visible.length"
-      :title="show === 'trouble' ? 'Everything is up' : 'Nothing is checked yet'"
-      :text="show === 'trouble' ? 'No service has failed a check lately.' : undefined"
-    >
-      <template v-if="show === 'trouble'" #actions><VxButton @click="show = 'all'">Show all services</VxButton></template>
-    </VxEmptyState>
-    <section v-for="g in groups" :key="g.name">
-      <h2 class="vx-display sec">{{ g.name || 'Other' }}</h2>
-      <div class="stack">
-        <EndpointRow
-          v-for="e in g.endpoints"
-          :key="e.key"
-          :endpoint="e"
-          :range="period"
-          :uptime="numbersOf(e)?.uptime"
-          :response-time="numbersOf(e)?.responseTime"
-          :now="live.updated.value ?? now"
-        />
-      </div>
-    </section>
   </StatusShell>
 </template>
 
 <style scoped>
-.head-note { margin: 0; }
 .announcements, .err { margin-bottom: 18px; }
 .controls { margin-bottom: 4px; }
 .legend { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0 0; padding: 0; font-size: 12px; }
@@ -151,5 +156,7 @@ const showOptions = [
 .legend .is-caution { background: var(--vx-caution); }
 .legend .is-down { background: var(--vx-bad); }
 .controls-gap { flex: 1; }
-section:first-of-type .sec { margin-top: 18px; }
+/* The first group's heading sits right under the controls. */
+.content { margin-top: 18px; }
+section:first-of-type .sec { margin-top: 0; }
 </style>

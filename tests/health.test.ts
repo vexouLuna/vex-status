@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CheckResult, EndpointStatus } from '../src/lib/gatus'
-import { announcementTone, failureOf, groupsOf, healthOf, gridOf, gridStart, incidentsOf, outagesOf, overallOf, percent, span, ticksOf, yearUptimeOf } from '../src/lib/health'
+import { announcementTone, failureOf, groupsOf, healthOf, gridOf, gridStart, incidentsOf, outagesOf, overallOf, percent, span, ticksOf, uptimeHealth, yearUptimeOf } from '../src/lib/health'
 
 const ok = (t = '2026-09-28T12:00:00Z'): CheckResult => ({ status: 200, duration: 21e6, success: true, timestamp: t })
 const bad = (extra: Partial<CheckResult> = {}): CheckResult => ({ status: 502, duration: 5e6, success: false, timestamp: '2026-09-28T12:01:00Z', ...extra })
@@ -139,6 +139,14 @@ describe('percent', () => {
   it('trims zeros', () => expect(percent(0.5)).toBe('50%'))
   it('is 100 when perfect', () => expect(percent(1)).toBe('100%'))
   it('is a dash with no number', () => expect(percent(null)).toBe('—'))
+})
+
+describe('uptimeHealth', () => {
+  it('is ok when perfect', () => expect(uptimeHealth(1)).toBe('ok'))
+  it('warns on any downtime', () => expect(uptimeHealth(0.9998)).toBe('warn'))
+  it('is caution when down over two thirds', () => expect(uptimeHealth(0.2)).toBe('caution'))
+  it('is down when down all of it', () => expect(uptimeHealth(0)).toBe('down'))
+  it('is off with no number', () => expect(uptimeHealth(null)).toBe('off'))
 })
 
 describe('failureOf', () => {
