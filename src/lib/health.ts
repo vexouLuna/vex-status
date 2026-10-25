@@ -123,8 +123,7 @@ export function span(msSpan: number): string {
   return h % 24 ? `${d} d ${h % 24} h` : `${d} d`
 }
 
-// A type, not an interface: VxTable's rows need an index signature, which only type aliases get implicitly.
-export type Incident = {
+export interface Incident {
   start: string
   /** null while still down. */
   end: string | null
