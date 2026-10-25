@@ -85,6 +85,13 @@ export function percent(ratio: number | null | undefined): string {
   return `${floored.toFixed(2).replace(/\.?0+$/, '')}%`
 }
 
+/** A period's uptime as a status, on the grid's shares: any downtime is warn, over two thirds caution, all of it down. */
+export function uptimeHealth(ratio: number | null | undefined): Health {
+  if (ratio === null || ratio === undefined || !Number.isFinite(ratio)) return 'off'
+  const down = 1 - ratio
+  return down <= 0 ? 'ok' : down >= 1 ? 'down' : down > 2 / 3 ? 'caution' : 'warn'
+}
+
 export const millis = (n: number | null | undefined) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : `${Math.round(n)} ms`)
 
 /** Why a check failed, in one line: the failed conditions, else the error, else the status code. */
@@ -116,7 +123,8 @@ export function span(msSpan: number): string {
   return h % 24 ? `${d} d ${h % 24} h` : `${d} d`
 }
 
-export interface Incident {
+// A type, not an interface: VxTable's rows need an index signature, which only type aliases get implicitly.
+export type Incident = {
   start: string
   /** null while still down. */
   end: string | null
