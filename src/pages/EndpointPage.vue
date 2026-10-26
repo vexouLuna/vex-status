@@ -2,7 +2,7 @@
 // One service: uptime and average response over every period, its last hundred checks (pick one to see it in
 // full), their response times, and its outages from Gatus's events. The checks are polled; the numbers are fetched
 // again only when due (useNumbers), or on Refresh.
-import { VxButton, VxCallout, VxEmptyState, VxLoadState, VxPageHead, VxSkeleton, VxStatTile, VxStatusDot, VxTable, VxUptimeBar } from '@vex/ui'
+import { VxButton, VxEmptyState, VxLoadState, VxPageHead, VxSkeleton, VxStatTile, VxStatusDot, VxTable, VxUptimeBar } from '@vex/ui'
 import type { TableColumn } from '@vex/ui'
 import { computed, ref, watch } from 'vue'
 import ResponseChart from '@/components/ResponseChart.vue'
@@ -60,12 +60,14 @@ const check = computed(() => results.value[selected.value ?? results.value.lengt
       <template #actions><VxButton to="/" variant="primary">All services</VxButton></template>
     </VxEmptyState>
     <template v-else>
-      <VxCallout v-if="live.error.value && ep" tone="warn" title="Couldn't refresh" class="err">
-        {{ live.error.value }}
-        <template #actions><VxButton size="sm" @click="live.reload()">Try again</VxButton></template>
-      </VxCallout>
-
-      <VxLoadState :error="ep ? undefined : live.error.value" error-title="Couldn't load this service" :loading="!ep" @retry="live.reload()">
+      <VxLoadState
+        :error="live.error.value"
+        error-title="Couldn't load this service"
+        :stale="!!ep"
+        stale-title="Couldn't refresh"
+        :loading="!ep"
+        @retry="live.reload()"
+      >
         <template #loading>
           <VxSkeleton h="60px" />
           <VxSkeleton h="80px" />
@@ -73,7 +75,7 @@ const check = computed(() => results.value[selected.value ?? results.value.lengt
         </template>
         <template v-if="ep">
           <VxPageHead :eyebrow="ep.group || 'service'" :title="ep.name">
-            <template #title><VxStatusDot class="big-dot" :status="health" />{{ ep.name }}</template>
+            <template #title><VxStatusDot size="lg" :status="health">{{ ep.name }}</VxStatusDot></template>
             <template #actions><VxButton size="sm" :disabled="live.loading.value" @click="refresh()">Refresh</VxButton></template>
             <span aria-live="polite">
               {{ HEALTH_WORD[health] }}<template v-if="results.length"> · last checked {{ dateTime(results.at(-1)!.timestamp) }}</template>
@@ -144,7 +146,6 @@ const check = computed(() => results.value[selected.value ?? results.value.lengt
 <style scoped>
 .back { display: inline-block; margin-bottom: 14px; }
 .back:hover { color: var(--vx-ink); }
-.err { margin-bottom: 18px; }
 .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .checks { padding: 14px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .check { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--vx-line); padding-top: 12px; }

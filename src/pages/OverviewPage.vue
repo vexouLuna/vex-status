@@ -74,7 +74,7 @@ const showOptions = [
     <VxPageHead :eyebrow="TITLE" title="">
       <template #title>
         <span aria-live="polite">
-          <template v-if="live.data.value"><VxStatusDot class="big-dot" :status="overall.health" />{{ overall.title }}</template>
+          <VxStatusDot v-if="live.data.value" size="lg" :status="overall.health">{{ overall.title }}</VxStatusDot>
           <template v-else-if="live.error.value">Status unknown</template>
           <template v-else>Checking…</template>
         </span>
@@ -89,11 +89,6 @@ const showOptions = [
         <div class="vx-muted small vx-mono">{{ dateTime(a.timestamp) }}</div>
       </VxCallout>
     </div>
-
-    <VxCallout v-if="live.error.value && live.data.value" tone="warn" :title="`Couldn't refresh, showing the checks from ${ago}`" class="err">
-      {{ live.error.value }}
-      <template #actions><VxButton size="sm" @click="live.reload()">Try again</VxButton></template>
-    </VxCallout>
 
     <div class="row controls">
       <span class="vx-muted small">Uptime over</span>
@@ -111,8 +106,10 @@ const showOptions = [
 
     <div class="content">
       <VxLoadState
-        :error="live.data.value ? undefined : live.error.value"
+        :error="live.error.value"
         error-title="Couldn't load the checks"
+        :stale="!!live.data.value"
+        :stale-title="`Couldn't refresh, showing the checks from ${ago}`"
         :loading="!live.data.value"
         :empty="!visible.length"
         row-height="84px"
@@ -146,7 +143,7 @@ const showOptions = [
 </template>
 
 <style scoped>
-.announcements, .err { margin-bottom: 18px; }
+.announcements { margin-bottom: 18px; }
 .controls { margin-bottom: 4px; }
 .legend { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0 0; padding: 0; font-size: 12px; }
 .legend li { display: flex; align-items: center; gap: 6px; }
