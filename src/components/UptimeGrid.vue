@@ -42,7 +42,7 @@ const hide = () => (shown.value = null)
 </script>
 
 <template>
-  <div class="grid" role="img" :aria-label="summary" :style="{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }" @pointerleave="hide">
+  <div class="grid" role="img" :aria-label="summary" :style="{ '--cols': columns.length, '--rows': rows }" @pointerleave="hide">
     <template v-for="(column, c) in columns" :key="c">
       <span v-for="(cell, r) in column" :key="r" class="cell" :class="`is-${cell.status}`" @pointerenter="show(c, r)"></span>
     </template>
@@ -51,8 +51,8 @@ const hide = () => (shown.value = null)
 </template>
 
 <style scoped>
-.grid { position: relative; display: grid; grid-auto-flow: column; column-gap: clamp(1px, 0.3%, 3px); row-gap: 2px; height: 58px; }
-.cell { border-radius: 2px; background: var(--vx-surface-2); min-width: 1px; }
+.grid { --gap: 2px; --max: 24px; width: 100%; position: relative; display: grid; grid-auto-flow: column; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows), auto); gap: var(--gap); max-width: calc(var(--cols) * (var(--max) + var(--gap))); margin-inline: auto; }
+.cell { aspect-ratio: 1; border-radius: 2px; background: var(--vx-surface-2); }
 .cell.is-ok { background: var(--vx-ok); }
 .cell.is-warn, .cell.is-partial { background: var(--vx-warn); }
 .cell.is-caution { background: var(--vx-caution); }
