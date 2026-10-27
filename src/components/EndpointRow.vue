@@ -36,7 +36,7 @@ const start = computed(() => gridStart(props.range, props.now))
       </span>
     </div>
     <UptimeGrid :columns="columns" :label="`${endpoint.name}, last ${range}`" />
-    <div class="ep-axis vx-mono small vx-muted" aria-hidden="true">
+    <div class="ep-axis vx-mono small vx-muted" :style="{ '--cols': columns.length }" aria-hidden="true">
       <span>{{ start }}</span>
       <span>now</span>
     </div>
@@ -55,5 +55,6 @@ const start = computed(() => gridStart(props.range, props.now))
 .ep-word.is-off { color: var(--vx-muted); }
 .ep-spacer { flex: 1; }
 .ep-nums { display: flex; gap: 14px; }
-.ep-axis { display: flex; justify-content: space-between; font-size: 11px; }
+/* Same width as UptimeGrid (its --max 24px, --gap 2px), so the labels sit at the grid's edges. */
+.ep-axis { display: flex; justify-content: space-between; font-size: 11px; width: 100%; max-width: calc(var(--cols) * 26px - 2px); margin-inline: auto; }
 </style>

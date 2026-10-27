@@ -51,7 +51,7 @@ const hide = () => (shown.value = null)
 </template>
 
 <style scoped>
-.grid { --gap: 2px; --max: 24px; width: 100%; position: relative; display: grid; grid-auto-flow: column; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows), auto); gap: var(--gap); max-width: calc(var(--cols) * (var(--max) + var(--gap))); margin-inline: auto; }
+.grid { --gap: 2px; --max: 24px; width: 100%; position: relative; display: grid; grid-auto-flow: column; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); grid-template-rows: repeat(var(--rows), auto); gap: var(--gap); max-width: calc(var(--cols) * (var(--max) + var(--gap)) - var(--gap)); margin-inline: auto; }
 .cell { aspect-ratio: 1; border-radius: 2px; background: var(--vx-surface-2); }
 .cell.is-ok { background: var(--vx-ok); }
 .cell.is-warn, .cell.is-partial { background: var(--vx-warn); }
