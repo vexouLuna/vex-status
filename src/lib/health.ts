@@ -42,10 +42,10 @@ export interface Group {
 /** Groups in this order (VITE_STATUS_GROUPS, for another Gatus's groups); any other group after them,
  * alphabetically, and ungrouped ones last. */
 const groupsEnv = (import.meta.env.VITE_STATUS_GROUPS ?? '').split(',').map((g) => g.trim()).filter(Boolean)
-export const GROUP_ORDER = groupsEnv.length ? groupsEnv : ['websites', 'API', 'infrastructure']
+export const GROUP_ORDER = groupsEnv.length ? groupsEnv : ['Websites', 'API', 'Infrastructure']
 
 const groupRank = (g: string) => {
-  const i = GROUP_ORDER.indexOf(g)
+  const i = GROUP_ORDER.findIndex((o) => o.toLowerCase() === g.toLowerCase())
   return i >= 0 ? i : g ? GROUP_ORDER.length : GROUP_ORDER.length + 1
 }
 /** Where a service's host sits in the network's list of sites; hosts that aren't a site go after all of them. */
@@ -57,7 +57,7 @@ const siteRank = (e: EndpointStatus) => {
 
 /**
  * Endpoints by group. Gatus lists them by key, not in its config's order, so the order is set here: groups as
- * GROUP_ORDER says, and within a group by the checked host's place in SITES (by hostname, since names are display
+ * GROUP_ORDER says (case-insensitive, so it holds across a Gatus rename), and within a group by the checked host's place in SITES (by hostname, since names are display
  * text), then by name.
  */
 export function groupsOf(endpoints: EndpointStatus[]): Group[] {

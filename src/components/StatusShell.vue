@@ -3,19 +3,17 @@
 // left out when sign-in is off (VITE_AUTH_BASE empty). With VITE_STATUS_SWITCHER=off the header shows the page's
 // name instead of the vexoul.net site switcher, for a build that isn't one of the network's sites.
 import { VxAccount, VxMark, VxSiteHeader, VxSiteShell } from '@vex/ui'
-import type { NavItem } from '@vex/ui'
 import { useAccount } from '@vex/ui/account'
 
-const NAV: NavItem[] = [{ label: 'Services', to: '/' }]
 const TITLE = __TITLE__
 const switcher = import.meta.env.VITE_STATUS_SWITCHER !== 'off'
 const account = useAccount()
 </script>
 
 <template>
-  <VxSiteShell site="status" :nav="NAV" :class="{ 'no-switcher': !switcher }">
+  <VxSiteShell site="status" :class="{ 'no-switcher': !switcher }">
     <template v-if="!switcher" #header>
-      <VxSiteHeader site="status" :nav="NAV">
+      <VxSiteHeader site="status">
         <template #brand>
           <RouterLink to="/" class="vx-switcher-trigger is-brand"><VxMark class="vx-switcher-mark" :size="22" /><b>{{ TITLE }}</b></RouterLink>
         </template>

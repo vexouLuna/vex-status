@@ -97,11 +97,11 @@ const showOptions = [
       <VxSegmented v-model="show" :options="showOptions" label="Which services" />
     </div>
     <ul class="legend vx-muted small" aria-label="Colours">
-      <li><i class="is-ok"></i>up</li>
-      <li><i class="is-warn"></i>failed checks, or down part of the time</li>
-      <li><i class="is-caution"></i>down most of it</li>
-      <li><i class="is-down"></i>down all of it</li>
-      <li><i class="is-off"></i>no record</li>
+      <li><i class="is-ok"></i>Up</li>
+      <li><i class="is-warn"></i>Unstable (some checks failed)</li>
+      <li><i class="is-caution"></i>Mostly down</li>
+      <li><i class="is-down"></i>Down</li>
+      <li><i class="is-off"></i>No data</li>
     </ul>
 
     <div class="content">
