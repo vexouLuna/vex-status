@@ -26,6 +26,8 @@ function refresh() {
 const notFound = computed(() => !live.data.value && /^404/.test(live.error.value ?? ''))
 
 const ep = computed(() => live.data.value ?? null)
+// The route's static title until the service has loaded; syncDocumentTitle resets it on the next navigation.
+watch(() => ep.value?.name, (name) => name && (document.title = `${name} · ${__TITLE__}`))
 const results = computed(() => ep.value?.results ?? [])
 const health = computed(() => healthOf(results.value))
 const ticks = computed(() => ticksOf(results.value))
