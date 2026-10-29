@@ -28,9 +28,10 @@ describe('groupsOf', () => {
     group,
     results: hostname ? [{ ...ok(), hostname }] : [],
   })
-  it('orders groups websites, API, infrastructure, then others alphabetically, then ungrouped', () => {
+  it('orders groups Websites, API, Infrastructure (any casing), then others alphabetically, then ungrouped', () => {
     const g = groupsOf([at('x', undefined), at('n', 'infrastructure'), at('z', 'zeta'), at('a', 'API'), at('w', 'websites'), at('b', 'beta')])
     expect(g.map((x) => x.name)).toEqual(['websites', 'API', 'infrastructure', 'beta', 'zeta', ''])
+    expect(groupsOf([at('i', 'Infrastructure'), at('w', 'Websites')]).map((x) => x.name)).toEqual(['Websites', 'Infrastructure'])
   })
   it('orders a group by the host of its first check in SITES, then by name; other hosts last', () => {
     const g = groupsOf([

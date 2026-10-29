@@ -26,8 +26,8 @@ git config core.hooksPath .conventions/githooks   # once per clone: branch-name 
 
 `/endpoints/:key` is the same path as Gatus's own endpoint pages, so links to those keep working.
 
-Gatus lists services by key, so the order is set here (`groupsOf` in `src/lib/health.ts`): groups `websites`,
-`API`, `infrastructure`, then any other group alphabetically; within a group, by where the checked host (the first
+Gatus lists services by key, so the order is set here (`groupsOf` in `src/lib/health.ts`): groups `Websites`,
+`API`, `Infrastructure`, (casing ignored), then any other group alphabetically; within a group, by where the checked host (the first
 result's `hostname`, not the display name) sits in `@vex/ui`'s `SITES`, then by name, with other hosts last.
 
 The front page's bars show the chosen period in slots: 60 × 1 min, 48 × 30 min, 42 × 4 h or 30 × 1 day. A slot is
