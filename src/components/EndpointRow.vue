@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // One service on the front page: its state, uptime and average response over the chosen range, and its history
-// over that range as a grid. The name opens the service's own page.
-import { VxButton, VxStatusDot, VxUptimeBar } from '@vex/ui'
-import { computed, ref } from 'vue'
+// over that range as a grid (an hour is a bar of pills instead). The name opens the service's own page.
+import { VxStatusDot, VxUptimeBar } from '@vex/ui'
+import { computed } from 'vue'
 import UptimeGrid from '@/components/UptimeGrid.vue'
 import type { EndpointStatus } from '@/lib/gatus'
 import { HEALTH_WORD, gridOf, gridStart, healthOf, millis, percent, ticksOf, type Range } from '@/lib/health'
@@ -18,8 +18,8 @@ const props = defineProps<{
 
 const health = computed(() => healthOf(props.endpoint.results))
 const columns = computed(() => gridOf(props.endpoint.results, props.endpoint.events, props.range, props.now))
-// Collapsed, a row is the latest checks as a bar; the full history grid opens on demand.
-const open = ref(false)
+// An hour is the latest checks as a bar of pills; every longer range is its history grid.
+const grid = computed(() => props.range !== '1h')
 const ticks = computed(() => ticksOf(props.endpoint.results))
 const start = computed(() => gridStart(props.range, props.now))
 </script>
@@ -32,16 +32,15 @@ const start = computed(() => gridStart(props.range, props.now))
       </RouterLink>
       <span class="ep-word small" :class="`is-${health}`">{{ HEALTH_WORD[health] }}</span>
       <span class="ep-spacer"></span>
-      <VxButton size="sm" variant="ghost" :aria-expanded="open" @click="open = !open">{{ open ? 'Hide history' : `History ${range}` }}</VxButton>
       <span class="ep-nums vx-mono small">
         <span :title="range === '1y' ? 'Uptime over the last year, from the outages on record' : `Uptime over the last ${range}`"><span class="vx-muted">{{ range }}</span> {{ percent(uptime) }}</span>
         <!-- Gatus keeps no response times past 30 days. -->
         <span v-if="range !== '1y'" :title="`Average response over the last ${range}`"><span class="vx-muted">avg</span> {{ millis(responseTime) }}</span>
       </span>
     </div>
-    <VxUptimeBar v-if="!open && ticks.length" :ticks="ticks" :height="24" :label="`${endpoint.name}, latest checks`" />
-    <UptimeGrid v-if="open" :columns="columns" :label="`${endpoint.name}, last ${range}`" />
-    <div v-if="open" class="ep-axis vx-mono small vx-muted" :style="{ '--cols': columns.length }" aria-hidden="true">
+    <VxUptimeBar v-if="!grid && ticks.length" :ticks="ticks" :height="24" :label="`${endpoint.name}, latest checks`" />
+    <UptimeGrid v-if="grid" :columns="columns" :label="`${endpoint.name}, last ${range}`" />
+    <div v-if="grid" class="ep-axis vx-mono small vx-muted" :style="{ '--cols': columns.length }" aria-hidden="true">
       <span>{{ start }}</span>
       <span>now</span>
     </div>

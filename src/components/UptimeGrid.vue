@@ -59,5 +59,5 @@ const hide = () => (shown.value = null)
 .cell.is-down { background: var(--vx-bad); }
 .cell.is-none { background: none; }
 .cell:not(.is-none):hover { opacity: 0.75; }
-.vx-tooltip-bubble { white-space: nowrap; top: auto; }
+.vx-tooltip-bubble { width: max-content; top: auto; }
 </style>
