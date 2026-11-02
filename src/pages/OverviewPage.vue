@@ -161,7 +161,7 @@ const showOptions = [
 .legend li { display: flex; align-items: center; gap: 6px; }
 .legend i { width: 10px; height: 10px; border-radius: 2px; background: var(--vx-surface-2); }
 .legend .is-ok { background: var(--vx-ok); }
-.legend .is-partial { background: var(--vx-partial, #bfd27a); }
+.legend .is-partial { background: var(--vx-partial); }
 .legend .is-warn { background: var(--vx-warn); }
 .legend .is-caution { background: var(--vx-caution); }
 .legend .is-down { background: var(--vx-bad); }
