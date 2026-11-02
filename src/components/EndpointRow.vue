@@ -18,7 +18,7 @@ const props = defineProps<{
   lost?: LostContact[]
 }>()
 
-const health = computed(() => healthOf(props.endpoint.results))
+const health = computed(() => healthOf(props.endpoint.results, props.uptime))
 const columns = computed(() => gridOf(props.endpoint.results, props.endpoint.events, props.range, props.now, props.lost))
 // An hour is the latest checks as a bar of pills; every longer range is its history grid.
 const grid = computed(() => props.range !== '1h')

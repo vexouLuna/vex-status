@@ -38,7 +38,7 @@ const show = computed<Show>({
 
 const endpoints = computed(() => live.data.value ?? [])
 const overall = computed(() => overallOf(endpoints.value))
-const visible = computed(() => (show.value === 'all' ? endpoints.value : endpoints.value.filter((e) => healthOf(e.results) !== 'ok')))
+const visible = computed(() => (show.value === 'all' ? endpoints.value : endpoints.value.filter((e) => healthOf(e.results, numbersOf(e)?.uptime) !== 'ok')))
 const groups = computed(() => groupsOf(visible.value))
 // Same-minute failed checks across most services: shown once, not against any service.
 const lost = computed(() => lostContactOf(endpoints.value, live.updated.value ?? undefined))

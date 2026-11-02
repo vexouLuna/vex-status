@@ -8,12 +8,16 @@ export const ms = (r: CheckResult) => r.duration / 1e6
 /** The states a service's checks can put it in (Health also has `caution`, which only outages' share sets). */
 export type CheckHealth = Extract<Health, 'ok' | 'warn' | 'down' | 'off'>
 
-/** A service is down when its latest check failed, unstable when an earlier one in view did, up otherwise. */
-export function healthOf(results: CheckResult[]): CheckHealth {
+/**
+ * A service is down when its latest check failed, unstable when 5% or more of the shown range was down (its
+ * `uptime` when known, else the share of failed checks in view), up otherwise: the grid's own rule.
+ */
+export function healthOf(results: CheckResult[], uptime?: number | null): CheckHealth {
   const last = results.at(-1)
   if (!last) return 'off'
   if (!last.success) return 'down'
-  return results.some((r) => !r.success) ? 'warn' : 'ok'
+  const down = uptime != null && Number.isFinite(uptime) ? 1 - uptime : results.filter((r) => !r.success).length / results.length
+  return down >= OK_SHARE ? 'warn' : 'ok'
 }
 
 export const HEALTH_WORD: Record<CheckHealth, string> = { ok: 'Up', warn: 'Unstable', down: 'Down', off: 'No data' }

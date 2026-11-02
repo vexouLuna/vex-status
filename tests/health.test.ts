@@ -11,6 +11,11 @@ describe('healthOf', () => {
   it('is down when the latest check failed', () => expect(healthOf([ok(), bad()])).toBe('down'))
   it('is unstable when an earlier check failed', () => expect(healthOf([bad(), ok()])).toBe('warn'))
   it('is up when every check passed', () => expect(healthOf([ok(), ok()])).toBe('ok'))
+  it('stays up when under 5% of the range was down', () => {
+    expect(healthOf([bad(), ...Array.from({ length: 29 }, () => ok())])).toBe('ok')
+    expect(healthOf([ok(), ok()], 0.97)).toBe('ok')
+  })
+  it('is unstable from 5% down', () => expect(healthOf([ok(), ok()], 0.9)).toBe('warn'))
 })
 
 describe('overallOf', () => {
