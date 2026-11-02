@@ -8,7 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import EndpointRow from '@/components/EndpointRow.vue'
 import StatusShell from '@/components/StatusShell.vue'
 import { gatus, type EndpointStatus } from '@/lib/gatus'
-import { GRID, RANGES, announcementTone, dateTime, groupsOf, healthOf, overallOf, yearUptimeOf, type Range } from '@/lib/health'
+import { GRID, RANGES, announcementTone, clock, dateTime, groupsOf, healthOf, lostContactOf, overallOf, relative, yearUptimeOf, zone, type Range } from '@/lib/health'
 import { useLive } from '@/lib/useLive'
 import { useNumbers } from '@/lib/useNumbers'
 
@@ -38,8 +38,11 @@ const show = computed<Show>({
 
 const endpoints = computed(() => live.data.value ?? [])
 const overall = computed(() => overallOf(endpoints.value))
-const visible = computed(() => (show.value === 'all' ? endpoints.value : endpoints.value.filter((e) => healthOf(e.results) !== 'ok')))
+const visible = computed(() => (show.value === 'all' ? endpoints.value : endpoints.value.filter((e) => healthOf(e.results, numbersOf(e)?.uptime) !== 'ok')))
 const groups = computed(() => groupsOf(visible.value))
+// Same-minute failed checks across most services: shown once, not against any service.
+const lost = computed(() => lostContactOf(endpoints.value, live.updated.value ?? undefined))
+const recentLost = computed(() => lost.value.filter((l) => (live.updated.value ?? Date.now()) - l.at < 24 * 3_600_000).slice(0, 3))
 const announcements = computed(() => config.data.value?.announcements ?? [])
 
 // Uptime and average response per service, each period's fetched again only when due (useNumbers). Gatus has
@@ -80,15 +83,20 @@ const showOptions = [
         </span>
       </template>
       <template #actions><VxButton size="sm" :disabled="live.loading.value" @click="refresh()">Refresh</VxButton></template>
-      Every service is checked once a minute.<template v-if="ago"> Updated {{ ago }}.</template>
+      Every service is checked once a minute.<template v-if="ago"> Updated {{ ago }}.</template> Times in {{ zone() }}.
     </VxPageHead>
 
     <div v-if="announcements.length" class="stack announcements">
       <VxCallout v-for="a in announcements" :key="a.timestamp + a.message" :tone="announcementTone(a)">
         {{ a.message }}
-        <div class="vx-muted small vx-mono">{{ dateTime(a.timestamp) }}</div>
+        <div class="vx-muted small vx-mono" :title="dateTime(a.timestamp)">{{ relative(a.timestamp, now) }}</div>
       </VxCallout>
     </div>
+    <ul v-if="recentLost.length" class="lost vx-muted small" aria-label="Checker lost contact">
+      <li v-for="l in recentLost" :key="l.at">
+        Checker lost contact for {{ l.length }} · <time :title="dateTime(new Date(l.at).toISOString())">{{ relative(l.at, now) }}</time>, at {{ clock(l.at) }}
+      </li>
+    </ul>
 
     <div class="row controls">
       <span class="vx-muted small">Uptime over</span>
@@ -97,11 +105,13 @@ const showOptions = [
       <VxSegmented v-model="show" :options="showOptions" label="Which services" />
     </div>
     <ul class="legend vx-muted small" aria-label="Colours">
-      <li><i class="is-ok"></i>Up</li>
-      <li><i class="is-warn"></i>Unstable (some checks failed)</li>
-      <li><i class="is-caution"></i>Mostly down</li>
-      <li><i class="is-down"></i>Down</li>
+      <li><i class="is-ok"></i>Up, or down under 5% of it</li>
+      <li><i class="is-partial"></i>Down 5–33%</li>
+      <li><i class="is-warn"></i>Down 33–67%</li>
+      <li><i class="is-caution"></i>Down over 67%</li>
+      <li><i class="is-down"></i>Down all of it</li>
       <li><i class="is-off"></i>No data</li>
+      <li class="vx-muted">A failed check counts as 1 min down.</li>
     </ul>
 
     <div class="content">
@@ -134,6 +144,7 @@ const showOptions = [
               :uptime="numbersOf(e)?.uptime"
               :response-time="numbersOf(e)?.responseTime"
               :now="live.updated.value ?? now"
+              :lost="lost"
             />
           </div>
         </section>
@@ -145,10 +156,12 @@ const showOptions = [
 <style scoped>
 .announcements { margin-bottom: 18px; }
 .controls { margin-bottom: 4px; }
+.lost { list-style: none; margin: -8px 0 18px; padding: 0; }
 .legend { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0 0; padding: 0; font-size: 12px; }
 .legend li { display: flex; align-items: center; gap: 6px; }
 .legend i { width: 10px; height: 10px; border-radius: 2px; background: var(--vx-surface-2); }
 .legend .is-ok { background: var(--vx-ok); }
+.legend .is-partial { background: var(--vx-partial); }
 .legend .is-warn { background: var(--vx-warn); }
 .legend .is-caution { background: var(--vx-caution); }
 .legend .is-down { background: var(--vx-bad); }

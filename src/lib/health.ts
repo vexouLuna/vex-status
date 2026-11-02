@@ -8,12 +8,16 @@ export const ms = (r: CheckResult) => r.duration / 1e6
 /** The states a service's checks can put it in (Health also has `caution`, which only outages' share sets). */
 export type CheckHealth = Extract<Health, 'ok' | 'warn' | 'down' | 'off'>
 
-/** A service is down when its latest check failed, unstable when an earlier one in view did, up otherwise. */
-export function healthOf(results: CheckResult[]): CheckHealth {
+/**
+ * A service is down when its latest check failed, unstable when 5% or more of the shown range was down (its
+ * `uptime` when known, else the share of failed checks in view), up otherwise: the grid's own rule.
+ */
+export function healthOf(results: CheckResult[], uptime?: number | null): CheckHealth {
   const last = results.at(-1)
   if (!last) return 'off'
   if (!last.success) return 'down'
-  return results.some((r) => !r.success) ? 'warn' : 'ok'
+  const down = uptime != null && Number.isFinite(uptime) ? 1 - uptime : results.filter((r) => !r.success).length / results.length
+  return down >= OK_SHARE ? 'warn' : 'ok'
 }
 
 export const HEALTH_WORD: Record<CheckHealth, string> = { ok: 'Up', warn: 'Unstable', down: 'Down', off: 'No data' }
@@ -73,9 +77,21 @@ export function groupsOf(endpoints: EndpointStatus[]): Group[] {
     .map(([name, list]) => ({ name, endpoints: list.sort((a, b) => siteRank(a) - siteRank(b) || byName(a.name, b.name)) }))
 }
 
-export const clock = (at: string | number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-export const dateTime = (iso: string) =>
-  new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+export const clock = (at: string | number) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+export const dateTime = (iso: string) => new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+/** A check's own time, to the second and with its zone: the one place seconds help. */
+export const dateTimeFull = (iso: string) =>
+  new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short' })
+/** The viewer's time zone as a short name ("GMT+1", "PST"), said once above or below the times it applies to. */
+export const zone = () => new Intl.DateTimeFormat([], { timeZoneName: 'short' }).formatToParts(0).find((p) => p.type === 'timeZoneName')?.value ?? ''
+
+/** "just now", "5 min ago", "3 h ago", "2 d ago": the absolute time goes in a `title`. */
+export function relative(at: string | number, now = Date.now()): string {
+  const m = Math.floor((now - new Date(at).getTime()) / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m} min ago`
+  return m < 1440 ? `${Math.floor(m / 60)} h ago` : `${Math.floor(m / 1440)} d ago`
+}
 
 /** 1 → "100%", 0.99931 → "99.93%", never rounding a miss up to 100. */
 export function percent(ratio: number | null | undefined): string {
@@ -85,11 +101,11 @@ export function percent(ratio: number | null | undefined): string {
   return `${floored.toFixed(2).replace(/\.?0+$/, '')}%`
 }
 
-/** A period's uptime as a status, on the grid's shares: any downtime is warn, over two thirds caution, all of it down. */
+/** A period's uptime as a status: ok from 99.9%, then the grid's shares: over two thirds down caution, all of it down. */
 export function uptimeHealth(ratio: number | null | undefined): Health {
   if (ratio === null || ratio === undefined || !Number.isFinite(ratio)) return 'off'
   const down = 1 - ratio
-  return down <= 0 ? 'ok' : down >= 1 ? 'down' : down > 2 / 3 ? 'caution' : 'warn'
+  return down < 0.001 ? 'ok' : down >= 1 ? 'down' : down > 2 / 3 ? 'caution' : 'warn'
 }
 
 export const millis = (n: number | null | undefined) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : `${Math.round(n)} ms`)
@@ -131,14 +147,18 @@ export interface Incident {
   length: string
 }
 
-/** Outages from Gatus's events: each UNHEALTHY up to the HEALTHY after it. Newest first. */
+/** An outage shorter than this is one failed check (checks run once a minute), not an outage. */
+export const BLIP_MS = 2 * 60_000
+
+/** Outages from Gatus's events: each UNHEALTHY up to the HEALTHY after it, without single failed checks. Newest first. */
 export function incidentsOf(events: EndpointEvent[] = [], now = Date.now()): Incident[] {
   const out: Incident[] = []
   let open: string | null = null
   for (const e of events) {
     if (e.type === 'UNHEALTHY' && !open) open = e.timestamp
     else if (e.type === 'HEALTHY' && open) {
-      out.push({ start: open, end: e.timestamp, length: span(Date.parse(e.timestamp) - Date.parse(open)) })
+      const took = Date.parse(e.timestamp) - Date.parse(open)
+      if (took >= BLIP_MS) out.push({ start: open, end: e.timestamp, length: span(took) })
       open = null
     }
   }
@@ -205,9 +225,14 @@ export const GRID: Record<Range, { cells: number; cell: Step; column: Step; rows
   '1y': { cells: 365, cell: DAY, column: WEEK, rows: 7 },
 }
 
+/** Where a cell's share of downtime changes its colour: under OK_SHARE it stays green, up to PARTIAL_SHARE it's
+ * `partial`, up to two thirds `warn`, above that `caution`, all of it `down`. */
+export const OK_SHARE = 0.05
+export const PARTIAL_SHARE = 1 / 3
+
 /**
- * A cell's state: Health, plus how much of it an outage took: `partial` up to two thirds, `caution` above that,
- * `down` all of it. `none` is a place in a partial column outside the range (before it, or still to come).
+ * A cell's state: Health, plus how much of it was down: `partial` from 5% to a third, `warn` to two thirds,
+ * `caution` above that, `down` all of it. `none` is a place in a partial column outside the range (before it, or still to come).
  */
 export type CellStatus = Health | 'partial' | 'caution' | 'none'
 export interface GridCell {
@@ -238,23 +263,47 @@ export function gridStart(range: Range, now: number): string {
  * state, so between events the state holds. When the oldest events have been dropped, the state before the first
  * one left is the opposite of it.
  */
-export function outagesOf(events: EndpointEvent[] = [], now = Date.now()): { since: number; down: [number, number][] } {
+export function outagesOf(events: EndpointEvent[] = [], now = Date.now()): { since: number; down: [number, number][]; blips: [number, number][] } {
   const start = events.find((e) => e.type === 'START')
   const since = start ? Date.parse(start.timestamp) : -Infinity
   const changes = events.filter((e) => e.type !== 'START')
   const down: [number, number][] = []
+  // Stretches shorter than BLIP_MS: a single failed check, not an outage.
+  const blips: [number, number][] = []
   let from: number | null = !start && changes[0]?.type === 'HEALTHY' ? -Infinity : null
   for (const e of changes) {
     const t = Date.parse(e.timestamp)
     if (e.type === 'UNHEALTHY' && from === null) from = t
     else if (e.type === 'HEALTHY' && from !== null) {
-      down.push([from, t])
+      ;(t - from < BLIP_MS ? blips : down).push([from, t])
       from = null
     }
   }
   if (from !== null) down.push([from, now])
-  return { since, down }
+  return { since, down, blips }
 }
+
+/** A moment when most services failed a check within the same minute: the checker lost contact, not the services. */
+export interface LostContact {
+  at: number
+  length: string
+}
+const LOST_WINDOW = 60_000
+
+/** Single failed checks that most services share within a minute, newest first. Needs 3+ services with events. */
+export function lostContactOf(endpoints: EndpointStatus[], now = Date.now()): LostContact[] {
+  const per = endpoints.filter((e) => e.events).map((e) => outagesOf(e.events, now).blips)
+  if (per.length < 3) return []
+  const all = per.flatMap((blips, i) => blips.map(([a, b]) => ({ a, b, i }))).sort((x, y) => x.a - y.a)
+  const out: LostContact[] = []
+  for (let k = 0; k < all.length; ) {
+    const group = all.filter((x) => x.a >= all[k]!.a && x.a < all[k]!.a + LOST_WINDOW)
+    if (new Set(group.map((x) => x.i)).size > per.length / 2) out.push({ at: all[k]!.a, length: span(Math.max(...group.map((x) => x.b - x.a))) })
+    k += group.length
+  }
+  return out.reverse()
+}
+const isLost = (t: number, lost: LostContact[]) => lost.some((l) => t >= l.at && t < l.at + LOST_WINDOW)
 
 /**
  * What's known of a service's outages: from when (checking began, or the oldest event Gatus still keeps), and the
@@ -277,11 +326,18 @@ const downIn = (down: [number, number][], from: number, end: number) =>
  * failed without making an outage, no data before the record begins, and up otherwise. Checks are only known
  * for the latest hundred minutes or so; outages for as far back as Gatus keeps its events.
  */
-export function gridOf(results: CheckResult[], events: EndpointEvent[] | undefined, range: Range, now = Date.now()): GridCell[][] {
+export function gridOf(
+  results: CheckResult[],
+  events: EndpointEvent[] | undefined,
+  range: Range,
+  now = Date.now(),
+  lost: LostContact[] = [],
+): GridCell[][] {
   const { cells, cell, column, rows } = GRID[range]
   const last = floorTo(now, cell)
   const first = add(last, cell, 1 - cells)
   const { known, started, down } = recordOf(results, events, now)
+  const blips = events ? outagesOf(events, now).blips.map(([a]) => a).filter((a) => !isLost(a, lost)) : []
   const columns: GridCell[][] = []
   for (let col = floorTo(first, column); col <= last; col = add(col, column, 1)) {
     const next = add(col, column, 1)
@@ -295,20 +351,29 @@ export function gridOf(results: CheckResult[], events: EndpointEvent[] | undefin
         const when = cellLabel(start, stop, cell)
         if (end <= known) return { status: 'off', label: `${when} · ${started ? 'not checked yet' : 'no record'}` }
         const from = Math.max(start, known)
-        const downMs = downIn(down, from, end)
-        if (downMs > 0) {
-          const ratio = downMs / (end - from)
-          const status = ratio >= 1 ? 'down' : ratio > 2 / 3 ? 'caution' : 'partial'
-          return { status, label: `${when} · down ${span(downMs)}${status === 'down' ? '' : ` (${Math.max(1, Math.round(ratio * 100))}%)`}` }
-        }
+        const outageMs = downIn(down, from, end)
         const inCell = results.filter((r) => {
           const t = Date.parse(r.timestamp)
           return t >= start && t < stop
         })
-        const failed = inCell.filter((r) => !r.success).length
-        if (failed) return { status: 'warn', label: `${when} · ${failed} failed ${failed === 1 ? 'check' : 'checks'}` }
-        if (inCell.length === 1 && cell.unit === 'min' && cell.n === 1) return { status: 'ok', label: ticksOf(inCell)[0]!.label }
-        return { status: 'ok', label: `${when} · up` }
+        // A failed check counts as the minute it stands for; checks and events see the same ones, so the larger count wins.
+        const failed = Math.max(
+          inCell.filter((r) => !r.success && !isLost(Date.parse(r.timestamp), lost)).length,
+          blips.filter((a) => a >= start && a < stop).length,
+        )
+        if (!outageMs && !failed) {
+          if (inCell.length === 1 && cell.unit === 'min' && cell.n === 1) return { status: 'ok', label: ticksOf(inCell)[0]!.label }
+          return { status: 'ok', label: `${when} · up` }
+        }
+        const ratio = Math.min(1, (outageMs + failed * 60_000) / (end - from))
+        let status: CellStatus = ratio < OK_SHARE ? 'ok' : ratio <= PARTIAL_SHARE ? 'partial' : ratio <= 2 / 3 ? 'warn' : ratio < 1 ? 'caution' : 'down'
+        // Failed checks alone are no outage: at most yellow.
+        if (!outageMs && (status === 'caution' || status === 'down')) status = 'warn'
+        const parts = [
+          outageMs && `down ${span(outageMs)}${status === 'down' ? '' : ` (${Math.max(1, Math.round((outageMs / (end - from)) * 100))}%)`}`,
+          failed && `${failed} failed ${failed === 1 ? 'check' : 'checks'}`,
+        ].filter(Boolean)
+        return { status, label: `${when} · ${parts.join(', ')}` }
       }),
     )
   }
