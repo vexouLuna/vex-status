@@ -5,7 +5,7 @@ import { VxStatusDot, VxUptimeBar } from '@vex/ui'
 import { computed } from 'vue'
 import UptimeGrid from '@/components/UptimeGrid.vue'
 import type { EndpointStatus } from '@/lib/gatus'
-import { HEALTH_WORD, gridOf, gridStart, healthOf, millis, percent, ticksOf, type Range } from '@/lib/health'
+import { HEALTH_WORD, gridOf, gridStart, healthOf, millis, percent, ticksOf, type LostContact, type Range } from '@/lib/health'
 
 const props = defineProps<{
   endpoint: EndpointStatus
@@ -14,10 +14,12 @@ const props = defineProps<{
   responseTime?: number | null
   /** When the data was fetched: the bar ends there. */
   now: number
+  /** Moments the checker lost contact: failed checks then aren't this service's. */
+  lost?: LostContact[]
 }>()
 
 const health = computed(() => healthOf(props.endpoint.results))
-const columns = computed(() => gridOf(props.endpoint.results, props.endpoint.events, props.range, props.now))
+const columns = computed(() => gridOf(props.endpoint.results, props.endpoint.events, props.range, props.now, props.lost))
 // An hour is the latest checks as a bar of pills; every longer range is its history grid.
 const grid = computed(() => props.range !== '1h')
 const ticks = computed(() => ticksOf(props.endpoint.results))

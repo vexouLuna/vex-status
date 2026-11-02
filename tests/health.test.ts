@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CheckResult, EndpointStatus } from '../src/lib/gatus'
-import { announcementTone, failureOf, groupsOf, healthOf, gridOf, gridStart, incidentsOf, outagesOf, overallOf, percent, span, ticksOf, uptimeHealth, yearUptimeOf } from '../src/lib/health'
+import { announcementTone, failureOf, groupsOf, healthOf, gridOf, gridStart, incidentsOf, lostContactOf, outagesOf, overallOf, percent, span, ticksOf, uptimeHealth, yearUptimeOf } from '../src/lib/health'
 
 const ok = (t = '2026-09-28T12:00:00Z'): CheckResult => ({ status: 200, duration: 21e6, success: true, timestamp: t })
 const bad = (extra: Partial<CheckResult> = {}): CheckResult => ({ status: 502, duration: 5e6, success: false, timestamp: '2026-09-28T12:01:00Z', ...extra })
@@ -111,7 +111,7 @@ describe('gridOf', () => {
     expect(col(9)[0]!.label).toMatch(/down 5 min \(33%\)$/)
     expect(col(9)[2]!.label).toMatch(/down 15 min$/)
     expect(col(5)[3]!.status).toBe('off') // 05:45–06:00: before checks began
-    expect(col(12).map((c) => c.status)).toEqual(['ok', 'warn', 'ok', 'none'])
+    expect(col(12).map((c) => c.status)).toEqual(['ok', 'partial', 'ok', 'none']) // 1 failed check of 15 min: 7%
   })
   it("shows no record, not an outage, before the oldest event Gatus kept", () => {
     const g = gridOf([], [{ type: 'HEALTHY', timestamp: at(28, 8) }], '24h', now)
@@ -144,7 +144,8 @@ describe('percent', () => {
 
 describe('uptimeHealth', () => {
   it('is ok when perfect', () => expect(uptimeHealth(1)).toBe('ok'))
-  it('warns on any downtime', () => expect(uptimeHealth(0.9998)).toBe('warn'))
+  it('is ok from 99.9%', () => expect(uptimeHealth(0.9991)).toBe('ok'))
+  it('warns below 99.9%', () => expect(uptimeHealth(0.9985)).toBe('warn'))
   it('is caution when down over two thirds', () => expect(uptimeHealth(0.2)).toBe('caution'))
   it('is down when down all of it', () => expect(uptimeHealth(0)).toBe('down'))
   it('is off with no number', () => expect(uptimeHealth(null)).toBe('off'))
@@ -200,5 +201,35 @@ describe('announcementTone', () => {
     expect(announcementTone({ timestamp: '', message: '', type: 'warning' })).toBe('warn')
     expect(announcementTone({ timestamp: '', message: '', type: 'operational' })).toBe('ok')
     expect(announcementTone({ timestamp: '', message: '' })).toBe('info')
+  })
+})
+
+describe('single failed checks', () => {
+  const t = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 28, 12, m, s)).toISOString()
+  const flip = (m: number, s = 0, len = 1) => [
+    { type: 'UNHEALTHY' as const, timestamp: t(m, s) },
+    { type: 'HEALTHY' as const, timestamp: t(m + len, s) },
+  ]
+  it('are no outage and no incident', () => {
+    const events = [{ type: 'START' as const, timestamp: t(0) }, ...flip(5), ...flip(20, 0, 3)]
+    expect(outagesOf(events, Date.parse(t(30))).blips).toEqual([[Date.parse(t(5)), Date.parse(t(6))]])
+    expect(incidentsOf(events, Date.parse(t(30))).map((i) => i.start)).toEqual([t(20)])
+  })
+  it('make a yellow 1-min cell, a green cell in a long one', () => {
+    const now = Date.parse(t(40))
+    const events = [{ type: 'START' as const, timestamp: t(0) }, ...flip(5)]
+    const hour = gridOf([], events, '1h', now).flat()
+    expect(hour.find((c) => c.label?.includes('1 failed check'))!.status).toBe('warn')
+    const week = gridOf([], events, '7d', now).flat()
+    expect(week.find((c) => c.label?.includes('1 failed check'))!.status).toBe('ok')
+  })
+  it('are one lost contact when most services share the minute', () => {
+    const start = { type: 'START' as const, timestamp: t(0) }
+    const eps = ['a', 'b', 'c', 'd'].map((k, i): EndpointStatus => ({ key: k, name: k, results: [], events: [start, ...flip(5, i * 5), ...(k === 'a' ? flip(15) : [])] }))
+    const lost = lostContactOf(eps, Date.parse(t(30)))
+    expect(lost).toHaveLength(1)
+    expect(lost[0]).toMatchObject({ at: Date.parse(t(5)), length: '1 min' })
+    const cells = gridOf([], eps[0]!.events, '1h', Date.parse(t(30)), lost).flat()
+    expect(cells.filter((c) => c.label?.includes('failed')).length).toBe(1) // only a's own blip at 12:15
   })
 })

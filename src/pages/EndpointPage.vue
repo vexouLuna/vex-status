@@ -4,11 +4,12 @@
 // again only when due (useNumbers), or on Refresh.
 import { VxButton, VxEmptyState, VxLoadState, VxPageHead, VxSkeleton, VxStatTile, VxStatusDot, VxTable, VxUptimeBar } from '@vex/ui'
 import type { TableColumn } from '@vex/ui'
+import { useNow } from '@vex/ui/utils'
 import { computed, ref, watch } from 'vue'
 import ResponseChart from '@/components/ResponseChart.vue'
 import StatusShell from '@/components/StatusShell.vue'
 import { PERIODS, gatus } from '@/lib/gatus'
-import { HEALTH_WORD, dateTime, failureOf, healthOf, incidentsOf, millis, ms, percent, ticksOf, uptimeHealth } from '@/lib/health'
+import { HEALTH_WORD, dateTime, dateTimeFull, failureOf, healthOf, incidentsOf, millis, ms, outagesOf, percent, relative, ticksOf, uptimeHealth, zone } from '@/lib/health'
 import { useLive } from '@/lib/useLive'
 import { useNumbers } from '@/lib/useNumbers'
 
@@ -32,6 +33,8 @@ const results = computed(() => ep.value?.results ?? [])
 const health = computed(() => healthOf(results.value))
 const ticks = computed(() => ticksOf(results.value))
 const incidents = computed(() => incidentsOf(ep.value?.events))
+const blips = computed(() => outagesOf(ep.value?.events).blips.length)
+const now = useNow(30_000)
 const OUTAGE_COLUMNS: TableColumn[] = [
   { key: 'start', label: 'Went down', mono: true, nowrap: true },
   { key: 'end', label: 'Came back', mono: true, nowrap: true },
@@ -80,7 +83,7 @@ const check = computed(() => results.value[selected.value ?? results.value.lengt
             <template #title><VxStatusDot size="lg" :status="health">{{ ep.name }}</VxStatusDot></template>
             <template #actions><VxButton size="sm" :disabled="live.loading.value" @click="refresh()">Refresh</VxButton></template>
             <span aria-live="polite">
-              {{ HEALTH_WORD[health] }}<template v-if="results.length"> · last checked {{ dateTime(results.at(-1)!.timestamp) }}</template>
+              {{ HEALTH_WORD[health] }}<template v-if="results.length"> · last checked <time :title="dateTimeFull(results.at(-1)!.timestamp)">{{ relative(results.at(-1)!.timestamp, now) }}</time></template>
             </span>
           </VxPageHead>
 
@@ -104,7 +107,7 @@ const check = computed(() => results.value[selected.value ?? results.value.lengt
               <div v-if="check" class="check" aria-live="polite">
                 <div class="row">
                   <VxStatusDot :status="check.success ? 'ok' : 'down'"><b>{{ check.success ? 'Passed' : 'Failed' }}</b></VxStatusDot>
-                  <span class="vx-mono small">{{ dateTime(check.timestamp) }}</span>
+                  <span class="vx-mono small">{{ dateTimeFull(check.timestamp) }}</span>
                   <span class="vx-muted small">{{ selected === null ? 'latest check · pick another above' : 'picked' }}</span>
                   <VxButton v-if="selected !== null" size="sm" variant="ghost" @click="selected = null">Show latest</VxButton>
                 </div>
@@ -129,7 +132,7 @@ const check = computed(() => results.value[selected.value ?? results.value.lengt
 
           <h2 class="vx-display sec">Outages</h2>
           <p v-if="!incidents.length" class="vx-muted">
-            None on record<template v-if="started">, since checks began {{ dateTime(started) }}</template>.
+            None on record<template v-if="started">, since checks began {{ dateTime(started) }} ({{ zone() }})</template>.
           </p>
           <VxTable v-else :columns="OUTAGE_COLUMNS" :rows="incidents" row-key="start" label="Outages">
             <template #cell-start="{ row }">{{ dateTime(row.start) }}</template>
@@ -138,7 +141,10 @@ const check = computed(() => results.value[selected.value ?? results.value.lengt
               <VxStatusDot v-else status="down">still down</VxStatusDot>
             </template>
           </VxTable>
-          <p v-if="incidents.length && started" class="vx-muted small">Checks began {{ dateTime(started) }}.</p>
+          <p v-if="incidents.length && started" class="vx-muted small">Checks began {{ dateTime(started) }}. Times in {{ zone() }}.</p>
+          <p v-if="blips" class="vx-muted small">
+            {{ blips }} single failed {{ blips === 1 ? 'check' : 'checks' }} (under 2 min) {{ blips === 1 ? "isn't" : "aren't" }} listed as outages.
+          </p>
         </template>
       </VxLoadState>
     </template>
