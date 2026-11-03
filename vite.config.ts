@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
   const title = env.VITE_STATUS_TITLE || 'vexoul.net status'
   return {
     define: { __COMMIT__: JSON.stringify(commit()), __TITLE__: JSON.stringify(title) },
-    plugins: [vue(), { name: 'status-title', transformIndexHtml: (html) => html.replace('%STATUS_TITLE%', title) }],
+    plugins: [vue(), { name: 'status-title', transformIndexHtml: (html) => html.replace('%STATUS_TITLE%', () => title.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`)) }],
     resolve: {
       alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
     },
