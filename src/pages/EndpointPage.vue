@@ -32,9 +32,9 @@ watch(() => ep.value?.name, (name) => name && (document.title = `${name} · ${__
 const results = computed(() => ep.value?.results ?? [])
 const health = computed(() => healthOf(results.value))
 const ticks = computed(() => ticksOf(results.value))
-const incidents = computed(() => incidentsOf(ep.value?.events))
 const blips = computed(() => outagesOf(ep.value?.events).blips.length)
 const now = useNow(30_000)
+const incidents = computed(() => incidentsOf(ep.value?.events, now.value))
 const OUTAGE_COLUMNS: TableColumn[] = [
   { key: 'start', label: 'Went down', mono: true, nowrap: true },
   { key: 'end', label: 'Came back', mono: true, nowrap: true },

@@ -26,7 +26,8 @@ async function request(path: string): Promise<Response> {
 const json = async <T>(path: string) => (await (await request(path)).json()) as T
 /** The uptime and response-time endpoints answer with a bare number as text. */
 const number = async (path: string) => {
-  const n = Number((await (await request(path)).text()).trim())
+  const text = (await (await request(path)).text()).trim()
+  const n = text ? Number(text) : NaN // Number('') is 0, which would read as 0% / 0 ms
   if (!Number.isFinite(n)) throw new ApiError(0, 'Not a number')
   return n
 }
