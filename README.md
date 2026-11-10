@@ -1,5 +1,13 @@
 # status.vexoul.net
 
+<!-- conventions:begin: synced from vexouLuna/conventions; edit it there, then run `conventions sync` -->
+[![CI](https://github.com/vexouLuna/vex-status/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/vexouLuna/vex-status/actions/workflows/ci.yml?query=branch%3Amain)
+[![publish](https://github.com/vexouLuna/vex-status/actions/workflows/publish.yml/badge.svg?branch=main)](https://github.com/vexouLuna/vex-status/actions/workflows/publish.yml?query=branch%3Amain)
+[![conventions v4.0.0](https://img.shields.io/badge/conventions-v4.0.0-blue)](https://github.com/vexouLuna/conventions/tree/v4.0.0)
+[![websites_status](https://status.vexoul.net/api/v1/endpoints/websites_status/health/badge.svg)](https://status.vexoul.net)
+[![websites_status uptime 7d](https://status.vexoul.net/api/v1/endpoints/websites_status/uptimes/7d/badge.svg)](https://status.vexoul.net)
+<!-- conventions:end -->
+
 Service health for the vexoul.net sites: whether each service is up, its uptime and response times, and its
 outages. Vue 3 + TypeScript on the shared [`@vex/ui`](https://github.com/vexouLuna/vex-ui) design, over the
 API of a [Gatus](https://github.com/TwiN/gatus) instance, which keeps doing the checks. It replaces Gatus's own pages.
