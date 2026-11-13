@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@vex/ui": "github:vexouLuna/vex-ui#v0.36.3",
-    "vue": "^3.5.44",
+    "vue": "^3.5.45",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
